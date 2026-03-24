@@ -50,10 +50,23 @@ class _MyAppState extends State<MyApp> {
     final filteredPath = p.join(directory.path, 'filtered_recording.wav');
 
     try {
+      // Check connectivity first
+      final status = await _surrPlugin.isTaalDeviceConnected();
+      if (status != TaalConnectionStatus.connected) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text("Taal device status: ${status.name}")),
+          );
+        }
+        return;
+      }
+
       await _surrPlugin.startRecorder(
         rawPath: rawPath,
         filteredPath: filteredPath,
         filter: PreFilter.heart,
+        preAmplification: 5,
+        recordingTime: 30,
       );
     } on PermissionException catch (e) {
       debugPrint("Permission Error: ${e.message}");
@@ -83,6 +96,41 @@ class _MyAppState extends State<MyApp> {
     }
   }
 
+  Future<void> _showFileInfo() async {
+    final directory = await getExternalStorageDirectory();
+    if (directory == null) return;
+    final path = p.join(directory.path, 'filtered_recording.wav');
+    if (!await File(path).exists()) {
+      debugPrint("File not found: $path");
+      return;
+    }
+
+    try {
+      final sampleRate = await _surrPlugin.readSampleRate(path);
+      final buffer = await _surrPlugin.getFloatBuffer(path);
+      if (mounted) {
+        showDialog(
+          context: context,
+          builder: (context) => AlertDialog(
+            title: const Text("File Info"),
+            content: Text(
+              "Sample Rate: $sampleRate Hz\n"
+              "Buffer size: ${buffer?.length ?? 0} samples",
+            ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.pop(context),
+                child: const Text("OK"),
+              ),
+            ],
+          ),
+        );
+      }
+    } on PlatformException catch (e) {
+      debugPrint("Error reading file info: $e");
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return MaterialApp(
@@ -101,6 +149,11 @@ class _MyAppState extends State<MyApp> {
               ElevatedButton(
                 onPressed: _startPlaying,
                 child: const Text('Start Player'),
+              ),
+              const SizedBox(height: 10),
+              ElevatedButton(
+                onPressed: _showFileInfo,
+                child: const Text('Show File Info'),
               ),
             ],
           ),

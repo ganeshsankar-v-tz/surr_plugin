@@ -11,10 +11,12 @@ import android.app.Activity
 import android.content.Intent
 import android.content.pm.PackageManager
 import android.Manifest
+import android.content.Context
 import androidx.core.content.ContextCompat
-import in.museinc.android.surr_ui_kit.recorder.RecorderActivity
-import in.museinc.android.surr_ui_kit.player.PlayerActivity
-import in.museinc.android.surr_core.utils.PreFilter
+import `in`.museinc.android.surr_ui_kit.recorder.RecorderActivity
+import `in`.museinc.android.surr_ui_kit.player.PlayerActivity
+import `in`.museinc.android.surr_core.utils.PreFilter
+import `in`.museinc.android.surr_core.utils.SurrUtils
 
 /** SurrPlugin */
 class SurrPlugin :
@@ -27,10 +29,12 @@ class SurrPlugin :
     // when the Flutter Engine is detached from the Activity
     private lateinit var channel: MethodChannel
     private var activity: Activity? = null
+    private var context: Context? = null
 
     override fun onAttachedToEngine(flutterPluginBinding: FlutterPlugin.FlutterPluginBinding) {
         channel = MethodChannel(flutterPluginBinding.binaryMessenger, "surr_plugin")
         channel.setMethodCallHandler(this)
+        context = flutterPluginBinding.applicationContext
     }
 
     override fun onMethodCall(
@@ -40,6 +44,15 @@ class SurrPlugin :
         when (call.method) {
             "getPlatformVersion" -> {
                 result.success("Android ${android.os.Build.VERSION.RELEASE}")
+            }
+            "isTaalDeviceConnected" -> {
+                val ctx = activity ?: context
+                if (ctx == null) {
+                    result.error("NO_CONTEXT", "Context is null", null)
+                    return
+                }
+                val status = SurrUtils.isTaalDeviceConnected(ctx)
+                result.success(status.ordinal)
             }
             "startRecorder" -> {
                 val act = activity
@@ -55,12 +68,12 @@ class SurrPlugin :
                     return
                 }
 
-                val rawPath = call.argument<String>("rawPath")!!
-                val filteredPath = call.argument<String>("filteredPath")!!
-                val liveAudio = call.argument<Boolean>("liveAudio") ?: true
-                val maxDuration = call.argument<Int>("maxDuration") ?: 30
-                val samplingRate = call.argument<Int>("samplingRate") ?: 44100
-                val filterIndex = call.argument<Int>("filter") ?: 0
+                val rawPath = call.argument<String>("rawAudioFilePath")!!
+                val filteredPath = call.argument<String>("preFilterAudioFilePath")!!
+                val playback = call.argument<Boolean>("playback") ?: true
+                val recordingTime = call.argument<Int>("recordingTime") ?: 30
+                val preAmplification = call.argument<Int>("preAmplification") ?: 5
+                val filterIndex = call.argument<Int>("preFilter") ?: 0
 
                 val filter = when (filterIndex) {
                     0 -> PreFilter.HEART
@@ -75,9 +88,9 @@ class SurrPlugin :
                     act,
                     rawPath,
                     filteredPath,
-                    liveAudio,
-                    maxDuration,
-                    samplingRate,
+                    playback,
+                    recordingTime,
+                    preAmplification,
                     filter
                 )
                 act.startActivity(intent)
@@ -89,10 +102,20 @@ class SurrPlugin :
                     result.error("NO_ACTIVITY", "Activity is null", null)
                     return
                 }
-                val path = call.argument<String>("path")!!
+                val path = call.argument<String>("filePath")!!
                 val intent = PlayerActivity.getIntent(act, path)
                 act.startActivity(intent)
                 result.success(null)
+            }
+            "readSampleRate" -> {
+                val path = call.argument<String>("path")!!
+                val sampleRate = SurrUtils.readSampleRate(path)
+                result.success(sampleRate)
+            }
+            "getFloatBuffer" -> {
+                val path = call.argument<String>("path")!!
+                val buffer = SurrUtils.getFloatBuffer(path)
+                result.success(buffer)
             }
             else -> {
                 result.notImplemented()

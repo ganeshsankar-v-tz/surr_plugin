@@ -4,6 +4,13 @@ import 'surr_plugin_method_channel.dart';
 
 enum PreFilter { heart, lungs, bowel, pregnancy, fullBody }
 
+enum TaalConnectionStatus {
+  connected,
+  notConnected,
+  deviceDoesNotSupportOTG,
+  invalidTaalConnected,
+}
+
 class PermissionException implements Exception {
   final String message;
   final String permission;
@@ -41,9 +48,9 @@ abstract class SurrPluginPlatform extends PlatformInterface {
   Future<void> startRecorder({
     required String rawPath,
     required String filteredPath,
-    bool liveAudio = true,
-    int maxDuration = 30,
-    int samplingRate = 44100,
+    bool playback = true,
+    int recordingTime = 30,
+    int preAmplification = 5,
     PreFilter filter = PreFilter.heart,
   }) {
     throw UnimplementedError('startRecorder() has not been implemented.');
@@ -51,5 +58,19 @@ abstract class SurrPluginPlatform extends PlatformInterface {
 
   Future<void> startPlayer({required String path}) {
     throw UnimplementedError('startPlayer() has not been implemented.');
+  }
+
+  Future<TaalConnectionStatus> isTaalDeviceConnected() {
+    throw UnimplementedError(
+      'isTaalDeviceConnected() has not been implemented.',
+    );
+  }
+
+  Future<int?> readSampleRate(String path) {
+    throw UnimplementedError('readSampleRate() has not been implemented.');
+  }
+
+  Future<List<double>?> getFloatBuffer(String path) {
+    throw UnimplementedError('getFloatBuffer() has not been implemented.');
   }
 }

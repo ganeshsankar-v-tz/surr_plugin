@@ -21,19 +21,19 @@ class MethodChannelSurrPlugin extends SurrPluginPlatform {
   Future<void> startRecorder({
     required String rawPath,
     required String filteredPath,
-    bool liveAudio = true,
-    int maxDuration = 30,
-    int samplingRate = 44100,
+    bool playback = true,
+    int recordingTime = 30,
+    int preAmplification = 5,
     PreFilter filter = PreFilter.heart,
   }) async {
     try {
       await methodChannel.invokeMethod('startRecorder', {
-        'rawPath': rawPath,
-        'filteredPath': filteredPath,
-        'liveAudio': liveAudio,
-        'maxDuration': maxDuration,
-        'samplingRate': samplingRate,
-        'filter': filter.index,
+        'rawAudioFilePath': rawPath,
+        'preFilterAudioFilePath': filteredPath,
+        'playback': playback,
+        'recordingTime': recordingTime,
+        'preAmplification': preAmplification,
+        'preFilter': filter.index,
       });
     } on PlatformException catch (e) {
       if (e.code == "PERMISSION_DENIED") {
@@ -48,6 +48,29 @@ class MethodChannelSurrPlugin extends SurrPluginPlatform {
 
   @override
   Future<void> startPlayer({required String path}) async {
-    await methodChannel.invokeMethod('startPlayer', {'path': path});
+    await methodChannel.invokeMethod('startPlayer', {'filePath': path});
+  }
+
+  @override
+  Future<TaalConnectionStatus> isTaalDeviceConnected() async {
+    final int status =
+        await methodChannel.invokeMethod<int>('isTaalDeviceConnected') ?? 1;
+    return TaalConnectionStatus.values[status];
+  }
+
+  @override
+  Future<int?> readSampleRate(String path) async {
+    return await methodChannel.invokeMethod<int>('readSampleRate', {
+      'path': path,
+    });
+  }
+
+  @override
+  Future<List<double>?> getFloatBuffer(String path) async {
+    final List<dynamic>? buffer = await methodChannel.invokeMethod<List>(
+      'getFloatBuffer',
+      {'path': path},
+    );
+    return buffer?.cast<double>();
   }
 }
