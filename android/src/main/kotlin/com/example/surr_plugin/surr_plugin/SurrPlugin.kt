@@ -15,14 +15,18 @@ import android.content.Context
 import androidx.core.content.ContextCompat
 import `in`.museinc.android.surr_ui_kit.recorder.RecorderActivity
 import `in`.museinc.android.surr_ui_kit.player.PlayerActivity
+import android.util.Log
+import android.hardware.usb.UsbManager
 import `in`.museinc.android.surr_core.utils.PreFilter
 import `in`.museinc.android.surr_core.utils.SurrUtils
+import `in`.museinc.android.surr_core.utils.TaalConnectivityStatus
 
 /** SurrPlugin */
 class SurrPlugin :
     FlutterPlugin,
     MethodCallHandler,
     ActivityAware {
+    private val TAG = "SurrPlugin"
     // The MethodChannel that will the communication between Flutter and native Android
     //
     // This local reference serves to register the plugin with the Flutter Engine and unregister it
@@ -51,8 +55,32 @@ class SurrPlugin :
                     result.error("NO_CONTEXT", "Context is null", null)
                     return
                 }
-                val status = SurrUtils.isTaalDeviceConnected(ctx)
-                result.success(status.ordinal)
+                
+                try {
+                    val status = SurrUtils.isTaalDeviceConnected(ctx)
+                    Log.d(TAG, "isTaalDeviceConnected: $status")
+                    
+                    when (status) {
+                        TaalConnectivityStatus.CONNECTED -> result.success(0)
+                        TaalConnectivityStatus.NOT_CONNECTED -> result.success(1)
+                        TaalConnectivityStatus.DEVICE_DOES_NOT_SUPPORT_OTG -> result.success(2)
+                        else -> {
+                            // Some other status? Check error message using reflection if needed
+                            // but since we imported the class we can just use the property/method
+                            val error = try { 
+                                val method = status.javaClass.getMethod("getError")
+                                method.invoke(status) as? String
+                            } catch(e: Exception) { null }
+                            
+                            if (error.isNullOrEmpty()) result.success(0)
+                            else if (error.contains("OTG", ignoreCase = true)) result.success(2)
+                            else result.success(1)
+                        }
+                    }
+                } catch (e: Exception) {
+                    Log.e(TAG, "isTaalDeviceConnected error: ${e.message}")
+                    result.success(1) // Default to notConnected
+                }
             }
             "startRecorder" -> {
                 val act = activity
